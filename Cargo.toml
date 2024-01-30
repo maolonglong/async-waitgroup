@@ -6,6 +6,8 @@ authors = ["Shaolong Chen <shaolong.chen@outlook.it>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/maolonglong/async-waitgroup"
 edition = "2021"
+categories = ["asynchronous", "concurrency"]
+keywords = ["atomic", "sync", "async", "waitgroup", "futures"]
 
 [dependencies]
 event-listener = { version = "4.0.0", default-features = false }
