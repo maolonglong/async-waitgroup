@@ -1,10 +1,12 @@
 [package]
 name = "async-waitgroup"
 description = "Golang like WaitGroup implementation that supports both sync and async Rust"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Shaolong Chen <shaolong.chen@outlook.it>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/maolonglong/async-waitgroup"
+homepage = "https://github.com/maolonglong/async-waitgroup"
+documentation = "https://docs.rs/async-waitgroup"
 edition = "2021"
 categories = ["asynchronous", "concurrency"]
 keywords = ["atomic", "sync", "async", "waitgroup", "futures"]
