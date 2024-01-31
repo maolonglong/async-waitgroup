@@ -203,3 +203,81 @@ impl fmt::Debug for WaitGroup {
         f.debug_struct("WaitGroup").field("count", &count).finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[cfg(feature = "std")]
+    use std::thread;
+
+    #[tokio::test]
+    async fn test_wait() {
+        const LOOP: usize = 10_000;
+
+        let wg = WaitGroup::new();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..LOOP {
+            tokio::spawn({
+                let wg = wg.clone();
+                let cnt = cnt.clone();
+                async move {
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                    drop(wg);
+                }
+            });
+        }
+
+        wg.wait().await;
+        assert_eq!(cnt.load(Ordering::Relaxed), LOOP)
+    }
+
+    #[cfg(all(feature = "std", not(target_family = "wasm")))]
+    #[test]
+    fn test_wait_blocking() {
+        const LOOP: usize = 100;
+
+        let wg = WaitGroup::new();
+        let cnt = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..LOOP {
+            thread::spawn({
+                let wg = wg.clone();
+                let cnt = cnt.clone();
+                move || {
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                    drop(wg);
+                }
+            });
+        }
+
+        wg.wait_blocking();
+        assert_eq!(cnt.load(Ordering::Relaxed), LOOP)
+    }
+
+    #[test]
+    fn test_clone() {
+        let wg = WaitGroup::new();
+        assert_eq!(Arc::strong_count(&wg.inner), 1);
+
+        let wg2 = wg.clone();
+        assert_eq!(Arc::strong_count(&wg.inner), 2);
+        assert_eq!(Arc::strong_count(&wg2.inner), 2);
+        drop(wg2);
+        assert_eq!(Arc::strong_count(&wg.inner), 1);
+    }
+
+    #[tokio::test]
+    async fn test_futures() {
+        let wg = WaitGroup::new();
+        let wg2 = wg.clone();
+
+        let w = wg.wait();
+        pin_utils::pin_mut!(w);
+        assert_eq!(futures_util::poll!(w.as_mut()), Poll::Pending);
+        assert_eq!(futures_util::poll!(w.as_mut()), Poll::Pending);
+
+        drop(wg2);
+        assert_eq!(futures_util::poll!(w.as_mut()), Poll::Ready(()));
+    }
+}
