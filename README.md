@@ -1,6 +1,6 @@
 # async-waitgroup
 
-[![Build Status](https://github.com/maolonglong/async-waitgroup/workflows/CI/badge.svg)](https://github.com/maolonglong/async-waitgroup/actions)
+[![CI](https://github.com/maolonglong/async-waitgroup/actions/workflows/ci.yml/badge.svg)](https://github.com/maolonglong/async-waitgroup/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-blue.svg)](https://github.com/maolonglong/async-waitgroup#license)
 [![Cargo](https://img.shields.io/crates/v/async-waitgroup.svg)](https://crates.io/crates/async-waitgroup)
 [![Documentation](https://docs.rs/async-waitgroup/badge.svg)](https://docs.rs/async-waitgroup)

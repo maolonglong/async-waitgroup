@@ -7,15 +7,16 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
+use core::fmt;
+use core::marker::PhantomPinned;
 use core::pin::Pin;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::Poll;
-#[cfg(feature = "std")]
-use std::fmt;
 
 use event_listener::{Event, EventListener};
 use event_listener_strategy::{easy_wrapper, EventListenerFuture, Strategy};
 use futures_core::ready;
+use pin_project_lite::pin_project;
 
 /// Enables tasks to synchronize the beginning or end of some computation.
 ///
@@ -102,10 +103,13 @@ impl WaitGroup {
     /// # }
     /// ```
     pub fn wait(self) -> Wait {
-        Wait::_new(WaitInner {
+        let w = Wait::_new(WaitInner {
             wg: self.inner.clone(),
-            listener: EventListener::new(),
-        })
+            listener: None,
+            _pin: PhantomPinned,
+        });
+        drop(self);
+        w
     }
 
     /// Waits using the blocking strategy.
@@ -142,11 +146,13 @@ easy_wrapper! {
     pub(crate) wait();
 }
 
-pin_project_lite::pin_project! {
+pin_project! {
+    #[project(!Unpin)]
     struct WaitInner {
         wg: Arc<WgInner>,
+        listener: Option<EventListener>,
         #[pin]
-        listener: EventListener,
+        _pin: PhantomPinned
     }
 }
 
@@ -158,7 +164,7 @@ impl EventListenerFuture for WaitInner {
         strategy: &mut S,
         context: &mut S::Context,
     ) -> Poll<Self::Output> {
-        let mut this = self.project();
+        let this = self.project();
 
         if this.wg.count.load(Ordering::SeqCst) == 0 {
             return Poll::Ready(());
@@ -166,10 +172,10 @@ impl EventListenerFuture for WaitInner {
 
         let mut count = this.wg.count.load(Ordering::SeqCst);
         while count > 0 {
-            if this.listener.is_listening() {
-                ready!(strategy.poll(this.listener.as_mut(), context))
+            if this.listener.is_some() {
+                ready!(strategy.poll(&mut *this.listener, context))
             } else {
-                this.listener.as_mut().listen(&this.wg.drop_ops);
+                *this.listener = Some(this.wg.drop_ops.listen());
             }
             count = this.wg.count.load(Ordering::SeqCst);
         }
@@ -196,7 +202,6 @@ impl Clone for WaitGroup {
     }
 }
 
-#[cfg(feature = "std")]
 impl fmt::Debug for WaitGroup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let count = self.inner.count.load(Ordering::SeqCst);
@@ -212,7 +217,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wait() {
-        const LOOP: usize = 10_000;
+        const LOOP: usize = if cfg!(miri) { 100 } else { 10_000 };
 
         let wg = WaitGroup::new();
         let cnt = Arc::new(AtomicUsize::new(0));
